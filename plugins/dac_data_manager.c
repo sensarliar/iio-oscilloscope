@@ -783,8 +783,10 @@ static void generateWavePeriod(void)
 }
 
 
-#define IIO_BUFFER_SIZE 512
+struct iio_buffer *dds_buffer_gm;
 
+#define IIO_BUFFER_SIZE 512
+/*
 static gboolean fillBuffer(struct dac_data_manager *manager)
 {
 	unsigned int i;
@@ -808,25 +810,30 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 
 	return TRUE;
 }
-
+*/
+static  unsigned int jjj =0;
 
 void getPacket(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
   int * id = (int *)arg;
   
   printf("id: %d\n", ++(*id));
-  printf("Packet length: %d\n", pkthdr->len);
-  printf("Number of bytes: %d\n", pkthdr->caplen);
-  printf("Recieved time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec)); 
+u_char *buf;
+		buf = iio_buffer_start(dds_buffer_gm);
 
   unsigned int i;
-  for(i=0; i<pkthdr->len; ++i)
+  for(i=0; i<pkthdr->len; )
   {
-    printf(" %02x", packet[i]);
-    if( (i + 1) % 16 == 0 )
-    {
-      printf("\n");
-    }
+buf[jjj] = packet[i];
+++i,++jjj;
+if(jjj>=2*IIO_BUFFER_SIZE)
+{
+		int ret = iio_buffer_push(dds_buffer_gm);
+		if (ret < 0)
+			printf("Error occured while writing to buffer: %d\n", ret);
+jjj=0;
+}
+
   }
 
 
@@ -884,8 +891,9 @@ device_glo= device;
   
   /* wait loop forever */
  // int id = 0;
+dds_buffer_gm =manager->dds_buffer;
 
-	g_thread_new("fill_buffer_thread", (void *) &fillBuffer, manager);
+//	g_thread_new("fill_buffer_thread", (void *) &fillBuffer, manager);
   //pcap_loop(device, -1, getPacket, (u_char*)&id);
 g_thread_new("pcap loop", (void *) &always_loop, NULL);
 
