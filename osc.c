@@ -1108,7 +1108,7 @@ static int lost_num =0;
 
 		if (dev_info->buffer == NULL || device_is_oneshot(dev)) {
 			dev_info->buffer_size = sample_count;
-iio_device_set_kernel_buffers_count(dev,100);
+iio_device_set_kernel_buffers_count(dev,128);
 			dev_info->buffer = iio_device_create_buffer(dev,
 				sample_count, false);
 

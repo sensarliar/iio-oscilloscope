@@ -866,7 +866,7 @@ unsigned int jjj=8;
 	 len_left=len_left-(1024-8);
 	}while(len_left>0);
 
-usleep(200);
+usleep(300);
 
 
 }
