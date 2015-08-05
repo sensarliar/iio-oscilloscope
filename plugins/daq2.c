@@ -32,14 +32,15 @@
 #include "./block_diagram.h"
 #include "dac_data_manager.h"
 
-#define THIS_DRIVER "DAQ2"
+#define THIS_DRIVER "DAQ2/3"
 
 #define SYNC_RELOAD "SYNC_RELOAD"
 
 #define ARRAY_SIZE(x) (!sizeof(x) ?: sizeof(x) / sizeof((x)[0]))
 
 #define ADC_DEVICE "axi-ad9680-hpc"
-#define DAC_DEVICE "axi-ad9144-hpc"
+#define DAQ2_DAC_DEVICE "axi-ad9144-hpc"
+#define DAQ3_DAC_DEVICE "axi-ad9152-hpc"
 
 static const gdouble mhz_scale = 1000000.0;
 static const gdouble khz_scale = 1000.0;
@@ -48,6 +49,8 @@ static struct dac_data_manager *dac_tx_manager;
 
 static struct iio_context *ctx;
 static struct iio_device *dac, *adc;
+static const char *dac_name;
+static bool is_daq3;
 
 static struct iio_widget tx_widgets[100];
 static struct iio_widget rx_widgets[100];
@@ -57,23 +60,44 @@ static bool can_update_widgets;
 
 static const char *daq2_sr_attribs[] = {
 	ADC_DEVICE".in_voltage_sampling_frequency",
-	DAC_DEVICE".out_altvoltage_sampling_frequency",
+	DAQ2_DAC_DEVICE".out_altvoltage_sampling_frequency",
 	"dds_mode",
 	"dac_buf_filename",
 	"tx_channel_0",
 	"tx_channel_1",
-	DAC_DEVICE".out_altvoltage0_1A_frequency",
-	DAC_DEVICE".out_altvoltage2_2A_frequency",
-	DAC_DEVICE".out_altvoltage1_1B_frequency",
-	DAC_DEVICE".out_altvoltage3_2B_frequency",
-	DAC_DEVICE".out_altvoltage0_1A_scale",
-	DAC_DEVICE".out_altvoltage2_2A_scale",
-	DAC_DEVICE".out_altvoltage1_1B_scale",
-	DAC_DEVICE".out_altvoltage3_2B_scale",
-	DAC_DEVICE".out_altvoltage0_1A_phase",
-	DAC_DEVICE".out_altvoltage1_1B_phase",
-	DAC_DEVICE".out_altvoltage2_2A_phase",
-	DAC_DEVICE".out_altvoltage3_2B_phase",
+	DAQ2_DAC_DEVICE".out_altvoltage0_1A_frequency",
+	DAQ2_DAC_DEVICE".out_altvoltage2_2A_frequency",
+	DAQ2_DAC_DEVICE".out_altvoltage1_1B_frequency",
+	DAQ2_DAC_DEVICE".out_altvoltage3_2B_frequency",
+	DAQ2_DAC_DEVICE".out_altvoltage0_1A_scale",
+	DAQ2_DAC_DEVICE".out_altvoltage2_2A_scale",
+	DAQ2_DAC_DEVICE".out_altvoltage1_1B_scale",
+	DAQ2_DAC_DEVICE".out_altvoltage3_2B_scale",
+	DAQ2_DAC_DEVICE".out_altvoltage0_1A_phase",
+	DAQ2_DAC_DEVICE".out_altvoltage1_1B_phase",
+	DAQ2_DAC_DEVICE".out_altvoltage2_2A_phase",
+	DAQ2_DAC_DEVICE".out_altvoltage3_2B_phase",
+};
+
+static const char *daq3_sr_attribs[] = {
+	ADC_DEVICE".in_voltage_sampling_frequency",
+	DAQ3_DAC_DEVICE".out_altvoltage_sampling_frequency",
+	"dds_mode",
+	"dac_buf_filename",
+	"tx_channel_0",
+	"tx_channel_1",
+	DAQ3_DAC_DEVICE".out_altvoltage0_1A_frequency",
+	DAQ3_DAC_DEVICE".out_altvoltage2_2A_frequency",
+	DAQ3_DAC_DEVICE".out_altvoltage1_1B_frequency",
+	DAQ3_DAC_DEVICE".out_altvoltage3_2B_frequency",
+	DAQ3_DAC_DEVICE".out_altvoltage0_1A_scale",
+	DAQ3_DAC_DEVICE".out_altvoltage2_2A_scale",
+	DAQ3_DAC_DEVICE".out_altvoltage1_1B_scale",
+	DAQ3_DAC_DEVICE".out_altvoltage3_2B_scale",
+	DAQ3_DAC_DEVICE".out_altvoltage0_1A_phase",
+	DAQ3_DAC_DEVICE".out_altvoltage1_1B_phase",
+	DAQ3_DAC_DEVICE".out_altvoltage2_2A_phase",
+	DAQ3_DAC_DEVICE".out_altvoltage3_2B_phase",
 };
 
 static const char * daq2_driver_attribs[] = {
@@ -146,14 +170,13 @@ static int daq2_handle_driver(const char *attrib, const char *value)
 {
 	if (MATCH_ATTRIB("dds_mode")) {
 		dac_data_manager_set_dds_mode(dac_tx_manager,
-				DAC_DEVICE, 1, atoi(value));
+				dac_name, 1, atoi(value));
 	} else if (!strncmp(attrib, "tx_channel_", sizeof("tx_channel_") - 1)) {
 		int tx = atoi(attrib + sizeof("tx_channel_") - 1);
 		dac_data_manager_set_tx_channel_state(
 				dac_tx_manager, tx, !!atoi(value));
 	} else if (MATCH_ATTRIB("dac_buf_filename")) {
-		if (dac_data_manager_get_dds_mode(dac_tx_manager,
-					DAC_DEVICE, 1) == DDS_BUFFER)
+		if (dac_data_manager_get_dds_mode(dac_tx_manager, dac_name, 1) == DDS_BUFFER)
 			dac_data_manager_set_buffer_chooser_filename(
 					dac_tx_manager, value);
 	} else if (MATCH_ATTRIB("SYNC_RELOAD")) {
@@ -177,7 +200,9 @@ static int daq2_handle(int line, const char *attrib, const char *value)
 
 static void load_profile(const char *ini_fn)
 {
-	unsigned i;
+	const char **attribs = is_daq3 ? daq3_sr_attribs : daq2_sr_attribs;
+	unsigned int i, nb_attribs = is_daq3 ? ARRAY_SIZE(daq3_sr_attribs) :
+		ARRAY_SIZE(daq2_sr_attribs);
 
 	for (i = 0; i < ARRAY_SIZE(daq2_driver_attribs); i++) {
 		char *value = read_token_from_ini(ini_fn, THIS_DRIVER,
@@ -188,10 +213,8 @@ static void load_profile(const char *ini_fn)
 		}
 	}
 
-	update_from_ini(ini_fn, THIS_DRIVER, dac, daq2_sr_attribs,
-			ARRAY_SIZE(daq2_sr_attribs));
-	update_from_ini(ini_fn, THIS_DRIVER, adc, daq2_sr_attribs,
-			ARRAY_SIZE(daq2_sr_attribs));
+	update_from_ini(ini_fn, THIS_DRIVER, dac, attribs, nb_attribs);
+	update_from_ini(ini_fn, THIS_DRIVER, adc, attribs, nb_attribs);
 
 	if (can_update_widgets) {
 		rx_update_values();
@@ -212,8 +235,14 @@ static GtkWidget * daq2_init(GtkWidget *notebook, const char *ini_fn)
 	if (!ctx)
 		return NULL;
 
-	dac = iio_context_find_device(ctx, DAC_DEVICE);
 	adc = iio_context_find_device(ctx, ADC_DEVICE);
+	dac = iio_context_find_device(ctx, DAQ2_DAC_DEVICE);
+
+	is_daq3 = !dac;
+	if (is_daq3)
+		dac = iio_context_find_device(ctx, DAQ3_DAC_DEVICE);
+
+	dac_name = iio_device_get_name(dac);
 
 	dac_tx_manager = dac_data_manager_new(dac, NULL, ctx);
 	if (!dac_tx_manager) {
@@ -296,7 +325,7 @@ static void save_widgets_to_ini(FILE *f)
 			"dac_buf_filename = %s\n"
 			"tx_channel_0 = %i\n"
 			"tx_channel_1 = %i\n",
-			dac_data_manager_get_dds_mode(dac_tx_manager, DAC_DEVICE, 1),
+			dac_data_manager_get_dds_mode(dac_tx_manager, dac_name, 1),
 			dac_data_manager_get_buffer_chooser_filename(dac_tx_manager),
 			dac_data_manager_get_tx_channel_state(dac_tx_manager, 0),
 			dac_data_manager_get_tx_channel_state(dac_tx_manager, 1));
@@ -333,8 +362,9 @@ static bool daq2_identify(void)
 {
 	/* Use the OSC's IIO context just to detect the devices */
 	struct iio_context *osc_ctx = get_context_from_osc();
-	return !!iio_context_find_device(osc_ctx, DAC_DEVICE) &&
-		!!iio_context_find_device(osc_ctx, ADC_DEVICE);
+	return !!iio_context_find_device(osc_ctx, ADC_DEVICE) && (
+			!!iio_context_find_device(osc_ctx, DAQ2_DAC_DEVICE) ||
+			!!iio_context_find_device(osc_ctx, DAQ3_DAC_DEVICE));
 }
 
 struct osc_plugin plugin = {
