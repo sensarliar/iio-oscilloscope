@@ -38,6 +38,16 @@
 #define WAVEFORM_TXT_INVALID_FORMAT 1
 #define WAVEFORM_MAT_INVALID_FORMAT 2
 
+#define SINEWAVE        0
+#define SQUAREWAVE      1
+#define TRIANGLE        2
+#define SAWTOOTH        3
+
+static unsigned int buffer_size;
+static uint8_t *soft_buffer_ch0;
+static unsigned int current_sample = 0;
+
+
 extern bool dma_valid_selection(const char *device, unsigned mask, unsigned channel_count);
 
 struct dds_tone {
@@ -652,6 +662,156 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 	}
 }
 
+
+
+static int FillSoftBuffer(int waveType, uint8_t *softBuffer)
+{
+	unsigned int sampleNr = 0;
+	int rawVal;
+	int intAmpl;
+	int intOffset;
+
+//	intAmpl = wave_ampl  * (256 / 3.3);
+//	intOffset = wave_offset * (256 / 3.3);
+	intAmpl = 0  * (256 / 3.3);
+	intOffset = 0 * (256 / 3.3);
+
+	switch (waveType){
+	case SINEWAVE:
+		for (; sampleNr < buffer_size; sampleNr++){
+			rawVal = (intAmpl/ 2) * sin(2 * sampleNr * G_PI / buffer_size) + intOffset;
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr] = rawVal;
+		}
+		break;
+	case SQUAREWAVE:
+		for (; sampleNr < buffer_size / 2; sampleNr++){
+			rawVal = intOffset - (intAmpl/ 2);
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr] = rawVal;
+
+		}
+		for (; sampleNr < buffer_size; sampleNr++){
+			rawVal = intOffset + (intAmpl/ 2);
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr] = rawVal;
+		}
+		break;
+	case TRIANGLE:
+		for (; sampleNr < buffer_size / 2; sampleNr++){
+			rawVal = sampleNr * intAmpl / (buffer_size / 2) + (intOffset - intAmpl / 2 );
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr] = rawVal;
+		}
+		for (sampleNr = 0; sampleNr < (buffer_size +1) / 2; sampleNr++){
+			rawVal = intAmpl - sampleNr * intAmpl / (buffer_size / 2) + (intOffset - intAmpl / 2 );
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr + buffer_size / 2] = rawVal;
+		}
+		break;
+	case SAWTOOTH:
+		for (; sampleNr < buffer_size; sampleNr++){
+			rawVal = sampleNr * intAmpl / buffer_size + (intOffset - intAmpl / 2 );
+			if (rawVal < 0)
+				rawVal = 0;
+			else if (rawVal > 255)
+				rawVal = 255;
+			softBuffer[sampleNr] = rawVal;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+
+static void generateWavePeriod(void)
+{
+	int waveType = 0;
+	double waveFreq;
+//	unsigned int i;
+	unsigned long triggerFreq;
+
+	triggerFreq = 1000;
+	waveFreq = 10;
+	buffer_size = (unsigned int)round(triggerFreq / waveFreq);
+	if (buffer_size < 2)
+		buffer_size = 2;
+	else if (buffer_size > 10000)
+		buffer_size = 10000;
+	current_sample = 0;
+
+	soft_buffer_ch0 = g_renew(uint8_t, soft_buffer_ch0, buffer_size);
+
+/*
+	if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn_sine)))
+		waveType = SINEWAVE;
+	else if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn_square)))
+		waveType = SQUAREWAVE;
+	else if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn_triangle)))
+		waveType = TRIANGLE;
+	else if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn_sawtooth)))
+		waveType = SAWTOOTH;
+*/
+	waveType = SINEWAVE;	
+	FillSoftBuffer(waveType, soft_buffer_ch0);
+
+
+}
+
+
+#define IIO_BUFFER_SIZE 400
+
+static gboolean fillBuffer(struct dac_data_manager *manager)
+{
+	unsigned int i;
+	uint8_t *buf;
+	int ret;
+
+	while (true) {
+		buf = iio_buffer_start(manager->dds_buffer);
+		for (i = 0; i < IIO_BUFFER_SIZE; i++) {
+			buf[i] = soft_buffer_ch0[current_sample];
+			current_sample++;
+			if (current_sample >= buffer_size)
+				current_sample = 0;
+		}
+
+		ret = iio_buffer_push(manager->dds_buffer);
+		if (ret < 0)
+			printf("Error occured while writing to buffer: %d\n", ret);
+	}
+
+	return TRUE;
+}
+
+static void startWaveGeneration(struct dac_data_manager *manager)
+{
+	g_thread_new("fill_buffer_thread", (void *) &fillBuffer, manager);
+}
+
+
+
+
+
+
 static int process_dac_buffer_file (struct dac_data_manager *manager, const char *file_name, char **stat_msg)
 {
 	int ret, size = 0, s_size;
@@ -729,8 +889,9 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		free(buf);
 		return -EINVAL;
 	}
+	size = IIO_BUFFER_SIZE*s_size;
 
-	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, true);
+	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, false);
 	if (!manager->dds_buffer) {
 		fprintf(stderr, "Unable to create buffer: %s\n", strerror(errno));
 		if (stat_msg)
@@ -739,10 +900,11 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		return -errno;
 	}
 
-	memcpy(iio_buffer_start(manager->dds_buffer), buf,
+/*	memcpy(iio_buffer_start(manager->dds_buffer), buf,
 			iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
 
 	iio_buffer_push(manager->dds_buffer);
+*/
 	free(buf);
 
 	tmp = strdup(file_name);
@@ -752,6 +914,9 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 
 	if (stat_msg)
 		*stat_msg = g_strdup_printf("Waveform loaded successfully.");
+
+	generateWavePeriod();
+	startWaveGeneration(manager);
 
 	return 0;
 }
