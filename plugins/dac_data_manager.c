@@ -673,8 +673,8 @@ static int FillSoftBuffer(int waveType, uint8_t *softBuffer)
 
 //	intAmpl = wave_ampl  * (256 / 3.3);
 //	intOffset = wave_offset * (256 / 3.3);
-	intAmpl = 0  * (256 / 3.3);
-	intOffset = 0 * (256 / 3.3);
+	intAmpl = 1  * (256 / 3.3);
+	intOffset = 3.3*0.5 * (256 / 3.3);
 
 	switch (waveType){
 	case SINEWAVE:
@@ -749,7 +749,7 @@ static void generateWavePeriod(void)
 //	unsigned int i;
 	unsigned long triggerFreq;
 
-	triggerFreq = 1000;
+	triggerFreq = 4000;
 	waveFreq = 10;
 	buffer_size = (unsigned int)round(triggerFreq / waveFreq);
 	if (buffer_size < 2)
