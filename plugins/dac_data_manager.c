@@ -44,7 +44,7 @@
 #define SAWTOOTH        3
 
 static unsigned int buffer_size;
-static uint8_t *soft_buffer_ch0;
+static uint16_t *soft_buffer_ch0;
 static unsigned int current_sample = 0;
 
 
@@ -664,7 +664,7 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 
 
 
-static int FillSoftBuffer(int waveType, uint8_t *softBuffer)
+static int FillSoftBuffer(int waveType, uint16_t *softBuffer)
 {
 	unsigned int sampleNr = 0;
 	int rawVal;
@@ -684,7 +684,7 @@ static int FillSoftBuffer(int waveType, uint8_t *softBuffer)
 				rawVal = 0;
 			else if (rawVal > 255)
 				rawVal = 255;
-			softBuffer[sampleNr] = rawVal;
+			softBuffer[sampleNr] = (short)rawVal;
 		}
 		break;
 	case SQUAREWAVE:
@@ -758,7 +758,7 @@ static void generateWavePeriod(void)
 		buffer_size = 10000;
 	current_sample = 0;
 
-	soft_buffer_ch0 = g_renew(uint8_t, soft_buffer_ch0, buffer_size);
+	soft_buffer_ch0 = g_renew(uint16_t, soft_buffer_ch0, buffer_size);
 
 /*
 	if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn_sine)))
@@ -782,7 +782,7 @@ static void generateWavePeriod(void)
 static gboolean fillBuffer(struct dac_data_manager *manager)
 {
 	unsigned int i;
-	uint8_t *buf;
+	uint16_t *buf;
 	int ret;
 
 	while (true) {
@@ -797,6 +797,7 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 		ret = iio_buffer_push(manager->dds_buffer);
 		if (ret < 0)
 			printf("Error occured while writing to buffer: %d\n", ret);
+		usleep(50000);
 	}
 
 	return TRUE;
