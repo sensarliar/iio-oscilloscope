@@ -667,24 +667,24 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 static int FillSoftBuffer(int waveType, uint16_t *softBuffer)
 {
 	unsigned int sampleNr = 0;
-	int rawVal;
+	int rawVal=-600;
 	int intAmpl;
 	int intOffset;
 
 //	intAmpl = wave_ampl  * (256 / 3.3);
 //	intOffset = wave_offset * (256 / 3.3);
-	intAmpl = 1  * (256 / 3.3);
-	intOffset = 3.3*0.5 * (256 / 3.3);
+	intAmpl = 0xcfff;//1  * (256 / 3.3);
+	intOffset = 450;//3.3*0.5 * (256 / 3.3);
 
 	switch (waveType){
 	case SINEWAVE:
 		for (; sampleNr < buffer_size; sampleNr++){
-			rawVal = (intAmpl/ 2) * sin(2 * sampleNr * G_PI / buffer_size) + intOffset;
-			if (rawVal < 0)
-				rawVal = 0;
-			else if (rawVal > 255)
-				rawVal = 255;
-			softBuffer[sampleNr] = (short)rawVal;
+		//	rawVal = (intAmpl/ 2) * sin(2 * sampleNr * G_PI / (buffer_size*1.25)) + intOffset;
+			rawVal ++;
+			if(rawVal >900)
+			rawVal = -600;			
+				
+			softBuffer[sampleNr] = (int16_t)rawVal;
 		}
 		break;
 	case SQUAREWAVE:
@@ -749,8 +749,8 @@ static void generateWavePeriod(void)
 //	unsigned int i;
 	unsigned long triggerFreq;
 
-	triggerFreq = 4000;
-	waveFreq = 10;
+	triggerFreq = 3000;
+	waveFreq = 2;
 	buffer_size = (unsigned int)round(triggerFreq / waveFreq);
 	if (buffer_size < 2)
 		buffer_size = 2;
@@ -777,7 +777,7 @@ static void generateWavePeriod(void)
 }
 
 
-#define IIO_BUFFER_SIZE 400
+#define IIO_BUFFER_SIZE 512
 
 static gboolean fillBuffer(struct dac_data_manager *manager)
 {
@@ -797,7 +797,7 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 		ret = iio_buffer_push(manager->dds_buffer);
 		if (ret < 0)
 			printf("Error occured while writing to buffer: %d\n", ret);
-		usleep(50000);
+		usleep(10000);
 	}
 
 	return TRUE;
@@ -914,7 +914,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	 manager->dac_buffer_module.dac_buf_filename = tmp;
 
 	if (stat_msg)
-		*stat_msg = g_strdup_printf("Waveform loaded successfully.");
+		*stat_msg = g_strdup_printf("Waveform loaded successfully,sample_size %d.",s_size);
 
 	generateWavePeriod();
 	startWaveGeneration(manager);

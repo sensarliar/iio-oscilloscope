@@ -1118,6 +1118,8 @@ static gboolean capture_process(void)
 			if (ret >= sample_count) {
 				iio_buffer_foreach_sample(
 						dev_info->buffer, demux_sample, NULL);
+				//struct iio_buffer *gm_buffer = dev_info->buffer;
+			//	printf("not increasing or Decreasing buffer size,dev_info->buffer_size:%d;dev_info->channel_trigger_enabled,%d;dev_info->channels_data_copy:%d\n", dev_info->buffer_size,dev_info->channel_trigger_enabled,dev_info->channels_data_copy>0);
 
 				if (ret >= sample_count * 2) {
 					printf("Decreasing buffer size\n");
@@ -1158,6 +1160,16 @@ static gboolean capture_process(void)
 			}
 		}
 
+				struct iio_channel *ch_gm = iio_device_get_channel(dev, 0);
+				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
+				int ii =0;
+				gfloat * gm_p = info_gm->data_ref;
+				for(;ii<sample_count;ii++)
+				{
+				printf("data count %d: value %f\n",ii,*(gm_p));
+				gm_p++;
+				}
+
 		if (dev_info->channels_data_copy) {
 			for (i = 0; i < nb_channels; i++) {
 				struct iio_channel *ch = iio_device_get_channel(dev, i);
@@ -1174,8 +1186,8 @@ static gboolean capture_process(void)
 			dev_info->buffer = NULL;
 		}
 
-		if (!dev_info->channel_trigger_enabled || offset)
-			update_plot(dev_info->buffer);
+		//if (!dev_info->channel_trigger_enabled || offset)
+			//update_plot(dev_info->buffer);
 	}
 
 	update_plot(NULL);
@@ -1321,7 +1333,7 @@ static void capture_start(void)
 	}
 	else {
 		stop_capture = FALSE;
-		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 50, (GSourceFunc) capture_process, NULL, NULL);
+		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 2, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
 
