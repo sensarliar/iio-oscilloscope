@@ -202,7 +202,7 @@ static void gfunc_destroy_plot(gpointer data, gpointer user_data)
 
 	osc_plot_destroy(OSC_PLOT(plot));
 }
-
+/*
 static void update_plot(struct iio_buffer *buf)
 {
 	GList *node;
@@ -215,7 +215,7 @@ static void update_plot(struct iio_buffer *buf)
 		}
 	}
 }
-
+*/
 static void restart_all_running_plots(void)
 {
 	g_list_foreach(plot_list, gfunc_restart_plot, NULL);
@@ -1074,7 +1074,7 @@ static gboolean capture_process(void)
 	if (stop_capture == TRUE)
 		goto capture_stop_check;
 
-	for (i = 0; i < num_devices; i++) {
+	for (i = 5; i < num_devices; i++) {
 		struct iio_device *dev = iio_context_get_device(ctx, i);
 		struct extra_dev_info *dev_info = iio_device_get_data(dev);
 		unsigned int i, sample_size = iio_device_get_sample_size(dev);
@@ -1108,6 +1108,8 @@ static gboolean capture_process(void)
 
 		while (true) {
 			ssize_t ret = iio_buffer_refill(dev_info->buffer);
+
+printf("o_buffer_refil ret:%d: sample_count:%d\n",(int)ret,(int)sample_count);
 			if (ret < 0) {
 				fprintf(stderr, "Error while reading data: %s\n", strerror(-ret));
 				stop_sampling();
@@ -1166,6 +1168,7 @@ static gboolean capture_process(void)
 				gfloat * gm_p = info_gm->data_ref;
 				for(;ii<sample_count;ii++)
 				{
+				if((ii<3)||(ii>sample_count-3))
 				printf("data count %d: value %f\n",ii,*(gm_p));
 				gm_p++;
 				}
@@ -1190,7 +1193,7 @@ static gboolean capture_process(void)
 			//update_plot(dev_info->buffer);
 	}
 
-	update_plot(NULL);
+	//update_plot(NULL);
 
 capture_stop_check:
 	if (stop_capture == TRUE)
@@ -1333,7 +1336,7 @@ static void capture_start(void)
 	}
 	else {
 		stop_capture = FALSE;
-		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 2, (GSourceFunc) capture_process, NULL, NULL);
+		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 1, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
 
