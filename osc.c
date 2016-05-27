@@ -990,7 +990,7 @@ static void plugin_state_ini_save(gpointer data, gpointer user_data)
 		fprintf(fp, "plugin.%s.y_pos=%d\n", p->plugin->name, y_pos);
 	}
 }
-
+/*
 static ssize_t demux_sample(const struct iio_channel *chn,
 		void *sample, size_t size, void *d)
 {
@@ -998,7 +998,7 @@ static ssize_t demux_sample(const struct iio_channel *chn,
 	struct extra_dev_info *dev_info = iio_device_get_data(info->dev);
 	const struct iio_data_format *format = iio_channel_get_data_format(chn);
 
-	/* Prevent buffer overflow */
+	// Prevent buffer overflow 
 	if ((unsigned long) info->offset == (unsigned long) dev_info->sample_count)
 		return 0;
 
@@ -1056,7 +1056,7 @@ static void apply_trigger_offset(const struct iio_channel *chn, off_t offset)
 				info->offset * sizeof(gfloat) - offset);
 	}
 }
-
+*/
 static bool device_is_oneshot(struct iio_device *dev)
 {
 	const char *name = iio_device_get_name(dev);
@@ -1118,11 +1118,12 @@ static gboolean capture_process(void)
 	for (i = 5; i < num_devices; i++) {
 		struct iio_device *dev = iio_context_get_device(ctx, i);
 		struct extra_dev_info *dev_info = iio_device_get_data(dev);
-		unsigned int i, sample_size = iio_device_get_sample_size(dev);
+		//unsigned int i, sample_size = iio_device_get_sample_size(dev);
+		unsigned int sample_size = iio_device_get_sample_size(dev);
 		unsigned int nb_channels = iio_device_get_channels_count(dev);
 		ssize_t sample_count = dev_info->sample_count;
-		struct iio_channel *chn;
-		off_t offset = 0;
+		//struct iio_channel *chn;
+		//off_t offset = 0;
 
 		if (dev_info->input_device == false)
 			continue;
@@ -1134,6 +1135,8 @@ static gboolean capture_process(void)
 			dev_info->buffer_size = sample_count;
 			dev_info->buffer = iio_device_create_buffer(dev,
 				sample_count, false);
+
+printf("create buffer ok\n");
 			if (!dev_info->buffer) {
 				fprintf(stderr, "Error: Unable to create buffer: %s\n", strerror(errno));
 				goto capture_stop_check;
@@ -1141,16 +1144,22 @@ static gboolean capture_process(void)
 		}
 
 		/* Reset the data offset for all channels */
+
+				struct iio_channel *ch_gm = iio_device_get_channel(dev, 0);
+				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
+				info_gm->offset = 0;
+
+/*
 		for (i = 0; i < nb_channels; i++) {
 			struct iio_channel *ch = iio_device_get_channel(dev, i);
 			struct extra_info *info = iio_channel_get_data(ch);
 			info->offset = 0;
 		}
-
+*/
 		while (true) {
 			ssize_t ret = iio_buffer_refill(dev_info->buffer);
 
-//printf("o_buffer_refil ret:%d: sample_count:%d\n",(int)ret,(int)sample_count);
+printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)sample_count,nb_channels);
 			if (ret < 0) {
 				fprintf(stderr, "Error while reading data: %s\n", strerror(-ret));
 				stop_sampling();
@@ -1159,52 +1168,32 @@ static gboolean capture_process(void)
 
 			ret /= iio_buffer_step(dev_info->buffer);
 			if (ret >= sample_count) {
-				iio_buffer_foreach_sample(
-						dev_info->buffer, demux_sample, NULL);
+			//	iio_buffer_foreach_sample(
+			//			dev_info->buffer, demux_sample, NULL);
 				//struct iio_buffer *gm_buffer = dev_info->buffer;
 			//	printf("not increasing or Decreasing buffer size,dev_info->buffer_size:%d;dev_info->channel_trigger_enabled,%d;dev_info->channels_data_copy:%d\n", dev_info->buffer_size,dev_info->channel_trigger_enabled,dev_info->channels_data_copy>0);
 
-				if (ret >= sample_count * 2) {
-					printf("Decreasing buffer size\n");
-					iio_buffer_destroy(dev_info->buffer);
-					dev_info->buffer_size /= 2;
-					dev_info->buffer = iio_device_create_buffer(dev,
-							dev_info->buffer_size, false);
-				}
+
 				break;
 			}
 
-			printf("Increasing buffer size\n");
-			iio_buffer_destroy(dev_info->buffer);
-			dev_info->buffer_size *= 2;
-			dev_info->buffer = iio_device_create_buffer(dev,
-					dev_info->buffer_size, false);
+
 		}
 
-		if (dev_info->channel_trigger_enabled) {
-			chn = iio_device_get_channel(dev, dev_info->channel_trigger);
-			if (!iio_channel_is_enabled(chn))
-				dev_info->channel_trigger_enabled = false;
-		}
+//struct iio_buffer *gm_buffer = dev_info->buffer;
 
-		if (dev_info->channel_trigger_enabled) {
-			struct extra_info *info = iio_channel_get_data(chn);
-			offset = get_trigger_offset(chn, dev_info->trigger_falling_edge,
-					dev_info->trigger_value);
-			if (offset / (off_t)sizeof(gfloat) < info->offset / 4) {
-				offset = 0;
-			} else if (offset) {
-				offset -= info->offset * sizeof(gfloat) / 4;
-				for (i = 0; i < nb_channels; i++) {
-					chn = iio_device_get_channel(dev, i);
-					if (iio_channel_is_enabled(chn))
-						apply_trigger_offset(chn, offset);
+	//uintptr_t ptr = (uintptr_t) gm_buffer->buffer;
+//short *ptr = gm_buffer->demux_bounce;
+	short *gm_p = iio_buffer_start(dev_info->buffer);
+				int ii =0;
+				for(;ii<sample_count;ii++)
+				{
+				if((ii<3)||(ii>sample_count-3))
+				printf("data count %d: value %d\n",ii,*(gm_p));
+				gm_p++;
 				}
-			}
-		}
+/*
 
-				struct iio_channel *ch_gm = iio_device_get_channel(dev, 0);
-				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
 				int ii =0;
 				gfloat * gm_p = info_gm->data_ref;
 				for(;ii<sample_count;ii++)
@@ -1214,21 +1203,7 @@ static gboolean capture_process(void)
 				gm_p++;
 				}
 
-		if (dev_info->channels_data_copy) {
-			for (i = 0; i < nb_channels; i++) {
-				struct iio_channel *ch = iio_device_get_channel(dev, i);
-				struct extra_info *info = iio_channel_get_data(ch);
-				memcpy(dev_info->channels_data_copy[i], info->data_ref,
-					sample_count * sizeof(gfloat));
-			}
-			dev_info->channels_data_copy = NULL;
-			G_UNLOCK(buffer_full);
-		}
-
-		if (device_is_oneshot(dev)) {
-			iio_buffer_destroy(dev_info->buffer);
-			dev_info->buffer = NULL;
-		}
+*/
 
 		//if (!dev_info->channel_trigger_enabled || offset)
 			//update_plot(dev_info->buffer);

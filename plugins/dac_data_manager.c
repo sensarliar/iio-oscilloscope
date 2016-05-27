@@ -797,7 +797,7 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 		ret = iio_buffer_push(manager->dds_buffer);
 		if (ret < 0)
 			printf("Error occured while writing to buffer: %d\n", ret);
-		usleep(1000);
+		usleep(500);
 	}
 
 	return TRUE;
