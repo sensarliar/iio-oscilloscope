@@ -1067,6 +1067,47 @@ static bool device_is_oneshot(struct iio_device *dev)
 	return false;
 }
 
+/*
+static gboolean capture_process_x(void)
+{
+	struct iio_device *dev = iio_context_get_device(ctx, 5);
+		struct extra_dev_info *dev_info = iio_device_get_data(dev);
+		ssize_t sample_count = dev_info->sample_count;
+
+				struct iio_channel *ch_gm = iio_device_get_channel(dev, 0);
+				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
+
+
+			info_gm->offset = 0;
+
+
+			iio_buffer_refill(dev_info->buffer);
+
+				iio_buffer_foreach_sample(
+						dev_info->buffer, demux_sample, NULL);
+
+
+
+
+				int ii =0;
+				gfloat * gm_p = info_gm->data_ref;
+				for(;ii<sample_count;ii++)
+				{
+				if((ii<3)||(ii>sample_count-3))
+				printf("data count %d: value %f\n",ii,*(gm_p));
+				gm_p++;
+				}
+
+
+
+
+
+	return 1;
+
+
+}
+
+*/
 static gboolean capture_process(void)
 {
 	unsigned int i;
@@ -1109,7 +1150,7 @@ static gboolean capture_process(void)
 		while (true) {
 			ssize_t ret = iio_buffer_refill(dev_info->buffer);
 
-printf("o_buffer_refil ret:%d: sample_count:%d\n",(int)ret,(int)sample_count);
+//printf("o_buffer_refil ret:%d: sample_count:%d\n",(int)ret,(int)sample_count);
 			if (ret < 0) {
 				fprintf(stderr, "Error while reading data: %s\n", strerror(-ret));
 				stop_sampling();
@@ -1336,6 +1377,7 @@ static void capture_start(void)
 	}
 	else {
 		stop_capture = FALSE;
+		//capture_process();
 		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 1, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
