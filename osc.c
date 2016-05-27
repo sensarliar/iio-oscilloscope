@@ -1353,7 +1353,7 @@ static void capture_start(void)
 	else {
 		stop_capture = FALSE;
 		//capture_process();
-		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 1, (GSourceFunc) capture_process, NULL, NULL);
+		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE, 0, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
 
