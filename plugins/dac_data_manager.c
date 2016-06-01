@@ -811,7 +811,7 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 	return TRUE;
 }
 */
-static  unsigned int jjj =0;
+//static  unsigned int jjj =0;
 
 void getPacket(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
@@ -819,25 +819,54 @@ void getPacket(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * p
   
   printf("id: %d\n", ++(*id));
 u_char *buf;
-		buf = iio_buffer_start(dds_buffer_gm);
 
-  unsigned int i;
-  for(i=0; i<pkthdr->len; )
-  {
-buf[jjj] = packet[i];
-++i,++jjj;
-if(jjj>=2*IIO_BUFFER_SIZE)
-{
+
+ short len_left = pkthdr->len;
+  unsigned int i=0;
+
+unsigned int jjj=8;
+	
+	do{
+
+		buf = iio_buffer_start(dds_buffer_gm);
+		buf[0]=0xAA;
+		buf[1]=(u_char)(*id);
+		buf[2]=(u_char)((pkthdr->len)&0xff);
+		buf[3]=(u_char)(((pkthdr->len)&0xff00)>>8);
+
+		buf[6]=(u_char)((*id)&0xff);
+		buf[7]=(u_char)(((*id)&0xff00)>>8);
+
+		if(len_left>1024-8)
+		{
+		buf[4]=0xf8;
+		buf[5]=0x03;	
+		}else
+		{
+		buf[4]=(u_char)(len_left&0xff);
+		buf[5]=(u_char)((len_left&0xff00)>>8);		
+		}
+		  for(; i<pkthdr->len; )
+  			{
+				buf[jjj] = packet[i];
+				++i,++jjj;
+				if(jjj>=2*IIO_BUFFER_SIZE)
+				{
+
+				jjj=8;
+				break;
+				}
+			 }
+
 		int ret = iio_buffer_push(dds_buffer_gm);
 		if (ret < 0)
 			printf("Error occured while writing to buffer: %d\n", ret);
-jjj=0;
-}
-
-  }
 
 
+	 len_left=len_left-(1024-8);
+	}while(len_left>0);
 
+usleep(500);
 
 
 }

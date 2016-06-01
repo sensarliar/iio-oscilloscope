@@ -1107,9 +1107,12 @@ static gboolean capture_process_x(void)
 
 }
 
+
+
 */
 static gboolean capture_process(void)
 {
+static int lost_num =0;
 	unsigned int i;
 
 	if (stop_capture == TRUE)
@@ -1184,26 +1187,25 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 
 	//uintptr_t ptr = (uintptr_t) gm_buffer->buffer;
 //short *ptr = gm_buffer->demux_bounce;
-	short *gm_p = iio_buffer_start(dev_info->buffer);
+	u_char *gm_p = iio_buffer_start(dev_info->buffer);
 				int ii =0;
-				for(;ii<sample_count;ii++)
+				if(0xaa!=*gm_p)
 				{
-				if((ii<3)||(ii>sample_count-3))
+				lost_num++;
+				printf("lost:%d\n",lost_num);
+				}
+
+				printf("all num:%d\n",*((short *)gm_p+1));
+				printf("this packet:%d\n",*((short *)gm_p+2));
+				printf("packet id:%d\n",*((short *)gm_p+3));
+
+				for(;ii<sample_count*2;ii++)
+				{
+				if((ii<6)||(ii>sample_count*2-3))
 				printf("data count %d: value %d\n",ii,*(gm_p));
 				gm_p++;
 				}
-/*
 
-				int ii =0;
-				gfloat * gm_p = info_gm->data_ref;
-				for(;ii<sample_count;ii++)
-				{
-				if((ii<3)||(ii>sample_count-3))
-				printf("data count %d: value %f\n",ii,*(gm_p));
-				gm_p++;
-				}
-
-*/
 
 		//if (!dev_info->channel_trigger_enabled || offset)
 			//update_plot(dev_info->buffer);
@@ -1352,8 +1354,8 @@ static void capture_start(void)
 	}
 	else {
 		stop_capture = FALSE;
-		//capture_process();
-		capture_function = g_timeout_add_full(G_PRIORITY_DEFAULT, 0, (GSourceFunc) capture_process, NULL, NULL);
+
+		capture_function = g_timeout_add_full(G_PRIORITY_HIGH, 0, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
 
