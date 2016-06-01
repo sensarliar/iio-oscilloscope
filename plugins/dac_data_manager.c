@@ -10,6 +10,12 @@
 #endif
 #include <matio.h>
 
+#include <pcap.h>
+#include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+
 #include "dac_data_manager.h"
 #include "../iio_widget.h"
 #include "../osc.h"
@@ -803,9 +809,87 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 	return TRUE;
 }
 
+
+void getPacket(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
+{
+  int * id = (int *)arg;
+  
+  printf("id: %d\n", ++(*id));
+  printf("Packet length: %d\n", pkthdr->len);
+  printf("Number of bytes: %d\n", pkthdr->caplen);
+  printf("Recieved time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec)); 
+
+  unsigned int i;
+  for(i=0; i<pkthdr->len; ++i)
+  {
+    printf(" %02x", packet[i]);
+    if( (i + 1) % 16 == 0 )
+    {
+      printf("\n");
+    }
+  }
+
+
+
+
+
+}
+
+  pcap_t * device_glo; 
+static void always_loop(void)
+{
+
+  int id = 0;
+
+	//g_thread_new("fill_buffer_thread", (void *) &fillBuffer, manager);
+  pcap_loop(device_glo, -1, getPacket, (u_char*)&id);
+}
+
+
+
 static void startWaveGeneration(struct dac_data_manager *manager)
 {
+
+char errBuf[PCAP_ERRBUF_SIZE], * devStr;
+  
+  /* get a device */
+//  devStr = pcap_lookupdev(errBuf);
+devStr = "eth0";
+  
+  if(devStr)
+  {
+    printf("success: device: %s\n", devStr);
+  }
+  else
+  {
+    printf("error: %s\n", errBuf);
+    exit(1);
+  }
+  
+  /* open a device, wait until a packet arrives */
+  pcap_t * device = pcap_open_live(devStr, 65535, 1, 0, errBuf);
+  
+  if(!device)
+  {
+    printf("error: pcap_open_live(): %s\n", errBuf);
+    exit(1);
+  }
+
+device_glo= device;
+
+//devStr1 = "eth1";
+
+//device_eth1 = pcap_open_live(devStr1, 65535, 1, 0, errBuf);
+
+  
+  /* wait loop forever */
+ // int id = 0;
+
 	g_thread_new("fill_buffer_thread", (void *) &fillBuffer, manager);
+  //pcap_loop(device, -1, getPacket, (u_char*)&id);
+g_thread_new("pcap loop", (void *) &always_loop, NULL);
+
+
 }
 
 
