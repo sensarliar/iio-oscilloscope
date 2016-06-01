@@ -26,6 +26,11 @@
 
 #include <iio.h>
 
+#include <pcap.h>
+#include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "libini2.h"
 #include "osc.h"
 #include "datatypes.h"
@@ -1110,6 +1115,14 @@ static gboolean capture_process_x(void)
 
 
 */
+
+pcap_t * device_eth1;
+//static bool completed =0;
+static u_char buff_send[65535];
+static unsigned int buf_send_p=0;
+
+
+
 static gboolean capture_process(void)
 {
 static int lost_num =0;
@@ -1193,18 +1206,43 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 				{
 				lost_num++;
 				printf("lost:%d\n",lost_num);
+				break;
 				}
+unsigned int pk_total_num= *((short *)gm_p+1);
+int this_pk_num=*((short *)gm_p+2);
+int packet_id= *((short *)gm_p+3);
 
-				printf("all num:%d\n",*((short *)gm_p+1));
-				printf("this packet:%d\n",*((short *)gm_p+2));
-				printf("packet id:%d\n",*((short *)gm_p+3));
+				printf("all num:%d\n",pk_total_num);
+				printf("this packet:%d\n",this_pk_num);
+				printf("packet id:%d\n",packet_id);
 
-				for(;ii<sample_count*2;ii++)
+				for(;(ii<sample_count*2)&&(ii<this_pk_num+8);ii++)
 				{
 				if((ii<6)||(ii>sample_count*2-3))
 				printf("data count %d: value %d\n",ii,*(gm_p));
+		
+				if(ii>7)
+				{
+				buff_send[buf_send_p]=*(gm_p);
+				buf_send_p++;
+
+				}
+
 				gm_p++;
 				}
+
+
+if(buf_send_p==pk_total_num)
+{
+int ret=pcap_inject(device_eth1,buff_send,pk_total_num);
+printf("send out datanum: %d,id:%d\n",ret,packet_id);
+buf_send_p=0;
+}
+else if(buf_send_p>pk_total_num)
+{
+printf("something wrong\n");
+buf_send_p=0;
+}
 
 
 		//if (!dev_info->channel_trigger_enabled || offset)
@@ -1212,6 +1250,7 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 	}
 
 	//update_plot(NULL);
+
 
 capture_stop_check:
 	if (stop_capture == TRUE)
@@ -1349,10 +1388,39 @@ static int capture_setup(void)
 
 static void capture_start(void)
 {
+
 	if (capture_function) {
 		stop_capture = FALSE;
+		  pcap_close(device_eth1);
 	}
 	else {
+
+
+			  char errBuf[PCAP_ERRBUF_SIZE], * devStr;
+			  
+			  /* get a device */
+			devStr = "eth1";
+			  
+			  if(devStr)
+			  {
+			    printf("success: device: %s\n", devStr);
+			  }
+			  else
+			  {
+			    printf("error: %s\n", errBuf);
+			    exit(1);
+			  }
+			  
+			  /* open a device, wait until a packet arrives */
+			  device_eth1 = pcap_open_live(devStr, 65535, 1, 0, errBuf);
+			  
+			  if(!device_eth1)
+			  {
+			    printf("error: pcap_open_live(): %s\n", errBuf);
+			    exit(1);
+			  }
+
+
 		stop_capture = FALSE;
 
 		capture_function = g_timeout_add_full(G_PRIORITY_HIGH, 0, (GSourceFunc) capture_process, NULL, NULL);
