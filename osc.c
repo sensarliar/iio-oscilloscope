@@ -1118,6 +1118,7 @@ static gboolean capture_process_x(void)
 
 pcap_t * device_eth1;
 //static bool completed =0;
+static int last_pk_id=0;
 static u_char buff_send[65535];
 static unsigned int buf_send_p=0;
 
@@ -1165,13 +1166,7 @@ printf("create buffer ok\n");
 				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
 				info_gm->offset = 0;
 
-/*
-		for (i = 0; i < nb_channels; i++) {
-			struct iio_channel *ch = iio_device_get_channel(dev, i);
-			struct extra_info *info = iio_channel_get_data(ch);
-			info->offset = 0;
-		}
-*/
+
 		while (true) {
 			ssize_t ret = iio_buffer_refill(dev_info->buffer);
 
@@ -1188,7 +1183,7 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 			//			dev_info->buffer, demux_sample, NULL);
 				//struct iio_buffer *gm_buffer = dev_info->buffer;
 			//	printf("not increasing or Decreasing buffer size,dev_info->buffer_size:%d;dev_info->channel_trigger_enabled,%d;dev_info->channels_data_copy:%d\n", dev_info->buffer_size,dev_info->channel_trigger_enabled,dev_info->channels_data_copy>0);
-
+				//	printf("buffer refill num is not right\n");
 
 				break;
 			}
@@ -1196,10 +1191,9 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 
 		}
 
-//struct iio_buffer *gm_buffer = dev_info->buffer;
 
-	//uintptr_t ptr = (uintptr_t) gm_buffer->buffer;
-//short *ptr = gm_buffer->demux_bounce;
+
+
 	u_char *gm_p = iio_buffer_start(dev_info->buffer);
 				int ii =0;
 				if(0xaa!=*gm_p)
@@ -1208,41 +1202,56 @@ printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)s
 				printf("lost:%d\n",lost_num);
 				break;
 				}
-unsigned int pk_total_num= *((short *)gm_p+1);
-int this_pk_num=*((short *)gm_p+2);
-int packet_id= *((short *)gm_p+3);
+				unsigned int pk_total_num= *((short *)gm_p+1);
+				int this_pk_num=*((short *)gm_p+2);
+				int packet_id= *((short *)gm_p+3);
 
 				printf("all num:%d\n",pk_total_num);
 				printf("this packet:%d\n",this_pk_num);
 				printf("packet id:%d\n",packet_id);
 
-				for(;(ii<sample_count*2)&&(ii<this_pk_num+8);ii++)
+				if(buf_send_p>0)
 				{
-				if((ii<6)||(ii>sample_count*2-3))
-				printf("data count %d: value %d\n",ii,*(gm_p));
-		
-				if(ii>7)
-				{
-				buff_send[buf_send_p]=*(gm_p);
-				buf_send_p++;
+					if(last_pk_id!=packet_id)
+					{
+				buf_send_p=0;
+				printf("packet not incomplete!\n");
+				//break;
+					}
 
 				}
+
+				for(;(ii<sample_count*2)&&(ii<this_pk_num+8);ii++)
+				{
+				//if((ii<6)||(ii>sample_count*2-3))
+				//printf("data count %d: value %d\n",ii,*(gm_p));
+		
+					if(ii>7)
+					{
+					buff_send[buf_send_p]=*(gm_p);
+					buf_send_p++;
+
+					}
 
 				gm_p++;
 				}
 
 
-if(buf_send_p==pk_total_num)
-{
-int ret=pcap_inject(device_eth1,buff_send,pk_total_num);
-printf("send out datanum: %d,id:%d\n",ret,packet_id);
-buf_send_p=0;
-}
-else if(buf_send_p>pk_total_num)
-{
-printf("something wrong\n");
-buf_send_p=0;
-}
+				if(buf_send_p==pk_total_num)
+				{
+				int ret=pcap_inject(device_eth1,buff_send,pk_total_num);
+				printf("send out datanum: %d,id:%d\n",ret,packet_id);
+				buf_send_p=0;
+				}
+				else if(buf_send_p>pk_total_num)
+				{
+				printf("something wrong\n");
+				buf_send_p=0;
+				}
+				else
+				{
+				last_pk_id = packet_id;
+				}
 
 
 		//if (!dev_info->channel_trigger_enabled || offset)
