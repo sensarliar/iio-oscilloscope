@@ -815,7 +815,7 @@ static gboolean fillBuffer(struct dac_data_manager *manager)
 
 void getPacket(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
-  int * id = (int *)arg;
+  short * id = (short *)arg;
   
   printf("id: %d\n", ++(*id));
 u_char *buf;
@@ -866,7 +866,7 @@ unsigned int jjj=8;
 	 len_left=len_left-(1024-8);
 	}while(len_left>0);
 
-usleep(500);
+usleep(200);
 
 
 }

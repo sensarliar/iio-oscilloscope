@@ -1072,49 +1072,7 @@ static bool device_is_oneshot(struct iio_device *dev)
 	return false;
 }
 
-/*
-static gboolean capture_process_x(void)
-{
-	struct iio_device *dev = iio_context_get_device(ctx, 5);
-		struct extra_dev_info *dev_info = iio_device_get_data(dev);
-		ssize_t sample_count = dev_info->sample_count;
 
-				struct iio_channel *ch_gm = iio_device_get_channel(dev, 0);
-				struct extra_info *info_gm = iio_channel_get_data(ch_gm);
-
-
-			info_gm->offset = 0;
-
-
-			iio_buffer_refill(dev_info->buffer);
-
-				iio_buffer_foreach_sample(
-						dev_info->buffer, demux_sample, NULL);
-
-
-
-
-				int ii =0;
-				gfloat * gm_p = info_gm->data_ref;
-				for(;ii<sample_count;ii++)
-				{
-				if((ii<3)||(ii>sample_count-3))
-				printf("data count %d: value %f\n",ii,*(gm_p));
-				gm_p++;
-				}
-
-
-
-
-
-	return 1;
-
-
-}
-
-
-
-*/
 
 pcap_t * device_eth1;
 //static bool completed =0;
@@ -1150,6 +1108,7 @@ static int lost_num =0;
 
 		if (dev_info->buffer == NULL || device_is_oneshot(dev)) {
 			dev_info->buffer_size = sample_count;
+iio_device_set_kernel_buffers_count(dev,24);
 			dev_info->buffer = iio_device_create_buffer(dev,
 				sample_count, false);
 
@@ -1172,9 +1131,17 @@ printf("create buffer ok\n");
 
 printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)sample_count,nb_channels);
 			if (ret < 0) {
+if(ret!=-110)
+{
 				fprintf(stderr, "Error while reading data: %s\n", strerror(-ret));
 				stop_sampling();
 				goto capture_stop_check;
+}
+else
+{
+printf("iio_buffer_refill time out 1s");
+goto capture_stop_check;
+}
 			}
 
 			ret /= iio_buffer_step(dev_info->buffer);
