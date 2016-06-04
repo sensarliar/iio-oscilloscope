@@ -1095,7 +1095,7 @@ static int lost_num =0;
 		struct extra_dev_info *dev_info = iio_device_get_data(dev);
 		//unsigned int i, sample_size = iio_device_get_sample_size(dev);
 		unsigned int sample_size = iio_device_get_sample_size(dev);
-		unsigned int nb_channels = iio_device_get_channels_count(dev);
+		//unsigned int nb_channels = iio_device_get_channels_count(dev);
 		ssize_t sample_count = dev_info->sample_count;
 		//struct iio_channel *chn;
 		//off_t offset = 0;
@@ -1108,7 +1108,7 @@ static int lost_num =0;
 
 		if (dev_info->buffer == NULL || device_is_oneshot(dev)) {
 			dev_info->buffer_size = sample_count;
-iio_device_set_kernel_buffers_count(dev,24);
+iio_device_set_kernel_buffers_count(dev,100);
 			dev_info->buffer = iio_device_create_buffer(dev,
 				sample_count, false);
 
@@ -1129,7 +1129,7 @@ printf("create buffer ok\n");
 		while (true) {
 			ssize_t ret = iio_buffer_refill(dev_info->buffer);
 
-printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)sample_count,nb_channels);
+//printf("o_buffer_refil ret:%d: sample_count:%d,nb_channels:%d\n",(int)ret,(int)sample_count,nb_channels);
 			if (ret < 0) {
 if(ret!=-110)
 {
@@ -1173,9 +1173,9 @@ goto capture_stop_check;
 				int this_pk_num=*((short *)gm_p+2);
 				int packet_id= *((short *)gm_p+3);
 
-				printf("all num:%d\n",pk_total_num);
-				printf("this packet:%d\n",this_pk_num);
-				printf("packet id:%d\n",packet_id);
+				//printf("all num:%d\n",pk_total_num);
+				//printf("this packet:%d\n",this_pk_num);
+				//printf("packet id:%d\n",packet_id);
 
 				if(buf_send_p>0)
 				{
@@ -1362,6 +1362,25 @@ static int capture_setup(void)
 	return 0;
 }
 
+
+static void always_capture(void)
+{
+	while(1)
+	{
+			if (stop_capture == TRUE)
+			{
+			capture_function = 0;
+			break;
+			}
+			else
+			{
+			capture_process();
+			}
+	}
+
+}
+
+
 static void capture_start(void)
 {
 
@@ -1398,8 +1417,9 @@ static void capture_start(void)
 
 
 		stop_capture = FALSE;
+g_thread_new("always capture", (void *) &always_capture,NULL);
 
-		capture_function = g_timeout_add_full(G_PRIORITY_HIGH, 0, (GSourceFunc) capture_process, NULL, NULL);
+		//capture_function = g_timeout_add_full(G_PRIORITY_HIGH, 0, (GSourceFunc) capture_process, NULL, NULL);
 	}
 }
 
