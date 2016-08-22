@@ -659,6 +659,34 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 	}
 }
 
+const char *file_name_gm;
+struct iio_buffer *dds_buffer_gm;
+static void always_gps_loop(void)
+{
+
+
+	FILE *infile = fopen(file_name_gm, "r");
+char *buf_ming;
+
+while(1){
+buf_ming=iio_buffer_start(dds_buffer_gm);
+	if(fread(buf_ming,4,NUM_PUSH_BUF,infile)!=NUM_PUSH_BUF)
+{
+	//ret=100;
+	break;
+}
+	iio_buffer_push(dds_buffer_gm);
+}
+fclose(infile);
+	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
+	//		iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
+
+
+
+	//free(buf);
+}
+
+
 static int process_dac_buffer_file (struct dac_data_manager *manager, const char *file_name, char **stat_msg)
 {
 	int ret, size = 0, s_size;
@@ -672,6 +700,8 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	*/
 	unsigned int buffer_channels = 0;
 	//unsigned int buffer_channels ;
+
+
 
 	if (manager->dds_buffer) {
 		iio_buffer_destroy(manager->dds_buffer);
@@ -711,6 +741,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 			*stat_msg = g_strdup_printf("Invalid data format");
 		return -EINVAL;
 	}
+*/
 
 /*
 	if (ret == -1 || buf == NULL) {
@@ -740,7 +771,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		return -EINVAL;
 	}
 	size = NUM_PUSH_BUF*s_size;
-	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, true);
+	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, false);
 	if (!manager->dds_buffer) {
 		fprintf(stderr, "Unable to create buffer: %s\n", strerror(errno));
 		if (stat_msg)
@@ -748,34 +779,11 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		free(buf);
 		return -errno;
 	}
-	FILE *infile = fopen(file_name, "r");
-char *buf_ming=iio_buffer_start(manager->dds_buffer);
-/*
-int ii;
-for(ii=0;ii<260000;ii++)
-{
-	if(fread(buf_ming,4,1,infile)!=1)
-{
-	ret=100;
-	break;
-}
-	buf_ming+=4;
-}
-*/
 
-	if(fread(buf_ming,4,NUM_PUSH_BUF,infile)!=NUM_PUSH_BUF)
-{
-	ret=100;
-	break;
-}
-
-fclose(infile);
-	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
-	//		iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
+file_name_gm = file_name;
+dds_buffer_gm = manager->dds_buffer;
 
 
-	iio_buffer_push(manager->dds_buffer);
-	//free(buf);
 
 	tmp = strdup(file_name);
 	if (manager->dac_buffer_module.dac_buf_filename)
@@ -784,6 +792,8 @@ fclose(infile);
 
 	if (stat_msg)
 		*stat_msg = g_strdup_printf("Waveform loaded successfully.%d.ret.%d.%d",s_size,ret,buffer_channels);
+
+g_thread_new("push gps loop", (void *) &always_gps_loop, NULL);
 
 	return 0;
 }
