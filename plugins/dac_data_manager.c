@@ -257,7 +257,11 @@ static int analyse_wavefile(struct dac_data_manager *manager,
 
 	if (infile == NULL)
 		return -errno;
-
+if(infile!=NULL)
+{
+fclose(infile);
+return 0;
+}
 	offset = dac_offset_get_value(manager->dac1.iio_dac);
 
 	if (fgets(line, 80, infile) != NULL) {
@@ -656,6 +660,7 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 static int process_dac_buffer_file (struct dac_data_manager *manager, const char *file_name, char **stat_msg)
 {
 	int ret, size = 0, s_size;
+//int  size = 0, s_size;
 	/*
 	struct stat st;
 	*/
@@ -664,6 +669,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	FILE *infile;
 	*/
 	unsigned int buffer_channels = 0;
+	//unsigned int buffer_channels ;
 
 	if (manager->dds_buffer) {
 		iio_buffer_destroy(manager->dds_buffer);
@@ -730,7 +736,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		free(buf);
 		return -EINVAL;
 	}
-
+	size = 260000*s_size;
 	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, true);
 	if (!manager->dds_buffer) {
 		fprintf(stderr, "Unable to create buffer: %s\n", strerror(errno));
@@ -739,12 +745,25 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		free(buf);
 		return -errno;
 	}
+	FILE *infile = fopen(file_name, "r");
+char *buf_ming=iio_buffer_start(manager->dds_buffer);
+int ii;
+for(ii=0;ii<260000;ii++)
+{
+	if(fread(buf_ming,4,1,infile)!=4)
+{
+	ret=100;
+	break;
+}
+	buf_ming+=8;
+}
+fclose(infile);
+	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
+	//		iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
 
-	memcpy(iio_buffer_start(manager->dds_buffer), buf,
-			iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
 
 	iio_buffer_push(manager->dds_buffer);
-	free(buf);
+	//free(buf);
 
 	tmp = strdup(file_name);
 	if (manager->dac_buffer_module.dac_buf_filename)
@@ -752,7 +771,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	 manager->dac_buffer_module.dac_buf_filename = tmp;
 
 	if (stat_msg)
-		*stat_msg = g_strdup_printf("Waveform loaded successfully.");
+		*stat_msg = g_strdup_printf("Waveform loaded successfully.%d.ret.%d.%d",s_size,ret,buffer_channels);
 
 	return 0;
 }
