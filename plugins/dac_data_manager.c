@@ -748,16 +748,25 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	}
 	FILE *infile = fopen(file_name, "r");
 char *buf_ming=iio_buffer_start(manager->dds_buffer);
+/*
 int ii;
 for(ii=0;ii<260000;ii++)
 {
-	if(fread(buf_ming,4,1,infile)!=4)
+	if(fread(buf_ming,4,1,infile)!=1)
 {
 	ret=100;
 	break;
 }
 	buf_ming+=4;
 }
+*/
+
+	if(fread(buf_ming,4,260000,infile)!=260000)
+{
+	ret=100;
+	break;
+}
+
 fclose(infile);
 	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
 	//		iio_buffer_end(manager->dds_buffer) - iio_buffer_start(manager->dds_buffer));
