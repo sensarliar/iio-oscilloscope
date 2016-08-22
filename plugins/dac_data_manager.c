@@ -699,6 +699,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	}
 
 	ret = analyse_wavefile(manager, file_name, &buf, &size, buffer_channels);
+/*
 	if (ret < 0) {
 		if (stat_msg)
 			*stat_msg = g_strdup_printf("Error while parsing file: %s.", strerror(-ret));
@@ -755,7 +756,7 @@ for(ii=0;ii<260000;ii++)
 	ret=100;
 	break;
 }
-	buf_ming+=8;
+	buf_ming+=4;
 }
 fclose(infile);
 	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
