@@ -38,6 +38,8 @@
 #define WAVEFORM_TXT_INVALID_FORMAT 1
 #define WAVEFORM_MAT_INVALID_FORMAT 2
 
+#define NUM_PUSH_BUF 260000
+
 extern bool dma_valid_selection(const char *device, unsigned mask, unsigned channel_count);
 
 struct dds_tone {
@@ -737,7 +739,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 		free(buf);
 		return -EINVAL;
 	}
-	size = 260000*s_size;
+	size = NUM_PUSH_BUF*s_size;
 	manager->dds_buffer = iio_device_create_buffer(dac, size / s_size, true);
 	if (!manager->dds_buffer) {
 		fprintf(stderr, "Unable to create buffer: %s\n", strerror(errno));
@@ -761,7 +763,7 @@ for(ii=0;ii<260000;ii++)
 }
 */
 
-	if(fread(buf_ming,4,260000,infile)!=260000)
+	if(fread(buf_ming,4,NUM_PUSH_BUF,infile)!=NUM_PUSH_BUF)
 {
 	ret=100;
 	break;
