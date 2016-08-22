@@ -663,19 +663,29 @@ const char *file_name_gm;
 struct iio_buffer *dds_buffer_gm;
 static void always_gps_loop(void)
 {
-
+long lSize;
 
 	FILE *infile = fopen(file_name_gm, "r");
-char *buf_ming;
+fseek(infile,0,SEEK_END);
+lSize=ftell(infile);
+rewind(infile);
 
-while(1){
-buf_ming=iio_buffer_start(dds_buffer_gm);
-	if(fread(buf_ming,4,NUM_PUSH_BUF,infile)!=NUM_PUSH_BUF)
+
+char *buf_ming;
+while(1)
 {
-	//ret=100;
-	break;
+rewind(infile);
+int kk=0;
+for(;kk<lSize/NUM_PUSH_BUF/4;kk++)
+{
+	buf_ming=iio_buffer_start(dds_buffer_gm);
+		if(fread(buf_ming,4,NUM_PUSH_BUF,infile)!=NUM_PUSH_BUF)
+	{
+		//ret=100;
+		break;
+	}
+		iio_buffer_push(dds_buffer_gm);
 }
-	iio_buffer_push(dds_buffer_gm);
 }
 fclose(infile);
 	//memcpy(iio_buffer_start(manager->dds_buffer), buf,
@@ -731,7 +741,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 	}
 
 	ret = analyse_wavefile(manager, file_name, &buf, &size, buffer_channels);
-/*
+
 	if (ret < 0) {
 		if (stat_msg)
 			*stat_msg = g_strdup_printf("Error while parsing file: %s.", strerror(-ret));
@@ -741,7 +751,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 			*stat_msg = g_strdup_printf("Invalid data format");
 		return -EINVAL;
 	}
-*/
+
 
 /*
 	if (ret == -1 || buf == NULL) {
@@ -783,7 +793,7 @@ static int process_dac_buffer_file (struct dac_data_manager *manager, const char
 file_name_gm = file_name;
 dds_buffer_gm = manager->dds_buffer;
 
-
+g_thread_new("push gps loop", (void *) &always_gps_loop, NULL);
 
 	tmp = strdup(file_name);
 	if (manager->dac_buffer_module.dac_buf_filename)
@@ -793,7 +803,7 @@ dds_buffer_gm = manager->dds_buffer;
 	if (stat_msg)
 		*stat_msg = g_strdup_printf("Waveform loaded successfully.%d.ret.%d.%d",s_size,ret,buffer_channels);
 
-g_thread_new("push gps loop", (void *) &always_gps_loop, NULL);
+
 
 	return 0;
 }
