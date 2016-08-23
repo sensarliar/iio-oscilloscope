@@ -659,15 +659,15 @@ static void enable_dds(struct dac_data_manager *manager, bool on_off)
 		}
 	}
 }
-FILE *infile;
-const char *file_name_gm;
+//FILE *infile;
+char file_name_gm[80];
 struct iio_buffer *dds_buffer_gm;
 static void always_gps_loop(void)
 {
 long lSize;
 long kk=0;
 printf("gaoming002,%s\n",file_name_gm);
-//	infile = fopen(file_name_gm, "r");
+	FILE *infile = fopen(file_name_gm, "r");
 fseek(infile,0,SEEK_END);
 lSize=ftell(infile);
 //rewind(infile);
@@ -688,7 +688,7 @@ printf("gaoming005\n");
 		break;
 	}
 		iio_buffer_push(dds_buffer_gm);
-printf("gaoming006\n");
+//printf("gaoming006\n");
 usleep(300);
 }
 printf("gaoming007\n");
@@ -795,13 +795,13 @@ printf("gaoming001\n");
 		free(buf);
 		return -errno;
 	}
-
-file_name_gm = file_name;
+strcpy(file_name_gm,file_name);
+//file_name_gm = file_name;
 dds_buffer_gm = manager->dds_buffer;
-infile = fopen(file_name, "r");
+//infile = fopen(file_name, "r");
 printf("gaoming004,%s\n",file_name);
-
-g_thread_new("push gps loop", (void *) &always_gps_loop, NULL);
+always_gps_loop();
+//g_thread_new("push gps loop", (void *) &always_gps_loop, NULL);
 
 	tmp = strdup(file_name);
 	if (manager->dac_buffer_module.dac_buf_filename)
