@@ -38,7 +38,8 @@
 #define WAVEFORM_TXT_INVALID_FORMAT 1
 #define WAVEFORM_MAT_INVALID_FORMAT 2
 
-#define NUM_PUSH_BUF 260000
+//#define NUM_PUSH_BUF 260000/16
+#define NUM_PUSH_BUF 16250
 
 extern bool dma_valid_selection(const char *device, unsigned mask, unsigned channel_count);
 
@@ -664,18 +665,19 @@ struct iio_buffer *dds_buffer_gm;
 static void always_gps_loop(void)
 {
 long lSize;
+long kk=0;
 printf("gaoming002,%s\n",file_name_gm);
 //	infile = fopen(file_name_gm, "r");
 fseek(infile,0,SEEK_END);
 lSize=ftell(infile);
 //rewind(infile);
-printf("gaoming003,%ld\n",lSize);
+printf("gaoming003,%ld,%ld\n",lSize,lSize/NUM_PUSH_BUF/4);
 
 char *buf_ming;
 while(1)
 {
 rewind(infile);
-int kk=0;
+kk=0;
 for(;kk<lSize/NUM_PUSH_BUF/4;kk++)
 {
 	buf_ming=iio_buffer_start(dds_buffer_gm);
@@ -687,6 +689,7 @@ printf("gaoming005\n");
 	}
 		iio_buffer_push(dds_buffer_gm);
 printf("gaoming006\n");
+usleep(300);
 }
 printf("gaoming007\n");
 }
